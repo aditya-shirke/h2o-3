@@ -53,7 +53,7 @@ public class GLMV3 extends ModelBuilderSchema<GLM,GLMV3,GLMV3.GLMParametersV3> {
             "plug_values",
             "compute_p_values",
             "dispersion_factor_method",
-            "init_dispersion_factor",
+            "init_dispersion_parameter",
             "remove_collinear_columns",
             "intercept",
             "non_negative",
@@ -87,8 +87,11 @@ public class GLMV3 extends ModelBuilderSchema<GLM,GLMV3,GLMV3.GLMParametersV3> {
             "generate_scoring_history",
             "auc_type",
             "dispersion_epsilon",
+            "tweedie_epsilon",
             "max_iterations_dispersion",
-            "build_null_model"
+            "build_null_model",
+            "fix_dispersion_parameter",
+            "fix_tweedie_variance_power"
     };
 
     @API(help = "Seed for pseudo random number generator (if applicable)", gridable = true)
@@ -209,8 +212,8 @@ public class GLMV3 extends ModelBuilderSchema<GLM,GLMV3,GLMV3.GLMParametersV3> {
     @API(help = "Prior probability for y==1. To be used only for logistic regression iff the data has been sampled and the mean of response does not reflect reality.", level = Level.expert)
     public double prior;
 
-    @API(help = "Initial value of disperion factor to be estimated using either pearson or ml.  Default to 1.0.", level = Level.expert)
-    public double init_dispersion_factor;
+    @API(help = "Initial value of disperion parameter to be estimated using either pearson or ml.  Default to 1.0.", level = Level.expert)
+    public double init_dispersion_parameter;
 
     @API(help = "Minimum lambda used in lambda search, specified as a ratio of lambda_max (the smallest lambda that drives all coefficients to zero)." +
     " Default indicates: if the number of observations is greater than the number of variables, then lambda_min_ratio" +
@@ -263,12 +266,25 @@ public class GLMV3 extends ModelBuilderSchema<GLM,GLMV3,GLMV3.GLMParametersV3> {
 
     @API(help="Request p-values computation, p-values work only with IRLSM solver and no regularization", level = Level.secondary, direction = Direction.INPUT)
     public boolean compute_p_values; // _remove_collinear_columns
+    
+    @API(help="If true, will fix dispersion_parameter value to the value set in init_dispersion_parameter",
+            level=Level.secondary, direction=Direction.INPUT)
+    public boolean fix_dispersion_parameter;
+
+    @API(help="If true, will fix tweedie variance power value to the value set in tweedie_variance_power",
+            level=Level.secondary, direction=Direction.INPUT)
+    public boolean fix_tweedie_variance_power;
 
     @API(help="In case of linearly dependent columns, remove some of the dependent columns", level = Level.secondary, direction = Direction.INPUT)
     public boolean remove_collinear_columns; // _remove_collinear_columns
 
     @API(help = "if changes in dispersion parameter estimation is smaller than dispersion_epsilon, will break out of the dispersion parameter estimation loop using maximum likelihood", level = API.Level.secondary, direction = API.Direction.INOUT)
     public double dispersion_epsilon;
+
+    @API(help = "In estimating tweedie dispersion parameter using maximum likelihood, this is used to choose the lower" +
+            " and upper indices in the approximating of the infinite series summation.", 
+            level = API.Level.secondary, direction = API.Direction.INOUT)
+    public double tweedie_epsilon;
     
     @API(help = "control the maximum number of iterations in the dispersion parameter estimation loop using maximum likelihood", level = API.Level.secondary, direction = API.Direction.INOUT)
     public int max_iterations_dispersion;

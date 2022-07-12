@@ -72,7 +72,8 @@
 #'        Defaults to FALSE.
 #' @param dispersion_factor_method Method used to estimate the dispersion factor for Tweedie, Gamma and Negative Binomial only. Must be one of:
 #'        "pearson", "ml". Defaults to pearson.
-#' @param init_dispersion_factor Initial value of disperion factor to be estimated using either pearson or ml.  Default to 1.0. Defaults to 1.
+#' @param init_dispersion_parameter Initial value of disperion parameter to be estimated using either pearson or ml.  Default to 1.0. Defaults to
+#'        1.
 #' @param remove_collinear_columns \code{Logical}. In case of linearly dependent columns, remove some of the dependent columns Defaults to FALSE.
 #' @param intercept \code{Logical}. Include constant term in the model Defaults to TRUE.
 #' @param non_negative \code{Logical}. Restrict coefficients (not intercept) to be non-negative Defaults to FALSE.
@@ -133,9 +134,15 @@
 #'        "WEIGHTED_OVO". Defaults to AUTO.
 #' @param dispersion_epsilon if changes in dispersion parameter estimation is smaller than dispersion_epsilon, will break out of the
 #'        dispersion parameter estimation loop using maximum likelihood Defaults to 0.0001.
+#' @param tweedie_epsilon In estimating tweedie dispersion parameter using maximum likelihood, this is used to choose the lower and
+#'        upper indices in the approximating of the infinite series summation. Defaults to 8e-17.
 #' @param max_iterations_dispersion control the maximum number of iterations in the dispersion parameter estimation loop using maximum likelihood
 #'        Defaults to 1000000.
 #' @param build_null_model \code{Logical}. If set, will build a model with only the intercept.  Default to false. Defaults to FALSE.
+#' @param fix_dispersion_parameter \code{Logical}. If true, will fix dispersion_parameter value to the value set in init_dispersion_parameter
+#'        Defaults to FALSE.
+#' @param fix_tweedie_variance_power \code{Logical}. If true, will fix tweedie variance power value to the value set in tweedie_variance_power
+#'        Defaults to FALSE.
 #' @return A subclass of \code{\linkS4class{H2OModel}} is returned. The specific subclass depends on the machine
 #'         learning task at hand (if it's binomial classification, then an \code{\linkS4class{H2OBinomialModel}} is
 #'         returned, if it's regression then a \code{\linkS4class{H2ORegressionModel}} is returned). The default print-
@@ -217,7 +224,7 @@ h2o.glm <- function(x,
                     plug_values = NULL,
                     compute_p_values = FALSE,
                     dispersion_factor_method = c("pearson", "ml"),
-                    init_dispersion_factor = 1,
+                    init_dispersion_parameter = 1,
                     remove_collinear_columns = FALSE,
                     intercept = TRUE,
                     non_negative = FALSE,
@@ -249,8 +256,11 @@ h2o.glm <- function(x,
                     generate_scoring_history = FALSE,
                     auc_type = c("AUTO", "NONE", "MACRO_OVR", "WEIGHTED_OVR", "MACRO_OVO", "WEIGHTED_OVO"),
                     dispersion_epsilon = 0.0001,
+                    tweedie_epsilon = 8e-17,
                     max_iterations_dispersion = 1000000,
-                    build_null_model = FALSE)
+                    build_null_model = FALSE,
+                    fix_dispersion_parameter = FALSE,
+                    fix_tweedie_variance_power = FALSE)
 {
   # Validate required training_frame first and other frame args: should be a valid key or an H2OFrame object
   training_frame <- .validate.H2OFrame(training_frame, required=TRUE)
@@ -355,8 +365,8 @@ h2o.glm <- function(x,
     parms$compute_p_values <- compute_p_values
   if (!missing(dispersion_factor_method))
     parms$dispersion_factor_method <- dispersion_factor_method
-  if (!missing(init_dispersion_factor))
-    parms$init_dispersion_factor <- init_dispersion_factor
+  if (!missing(init_dispersion_parameter))
+    parms$init_dispersion_parameter <- init_dispersion_parameter
   if (!missing(remove_collinear_columns))
     parms$remove_collinear_columns <- remove_collinear_columns
   if (!missing(intercept))
@@ -415,10 +425,16 @@ h2o.glm <- function(x,
     parms$auc_type <- auc_type
   if (!missing(dispersion_epsilon))
     parms$dispersion_epsilon <- dispersion_epsilon
+  if (!missing(tweedie_epsilon))
+    parms$tweedie_epsilon <- tweedie_epsilon
   if (!missing(max_iterations_dispersion))
     parms$max_iterations_dispersion <- max_iterations_dispersion
   if (!missing(build_null_model))
     parms$build_null_model <- build_null_model
+  if (!missing(fix_dispersion_parameter))
+    parms$fix_dispersion_parameter <- fix_dispersion_parameter
+  if (!missing(fix_tweedie_variance_power))
+    parms$fix_tweedie_variance_power <- fix_tweedie_variance_power
 
   if( !missing(interactions) ) {
     # interactions are column names => as-is
@@ -482,7 +498,7 @@ h2o.glm <- function(x,
                                     plug_values = NULL,
                                     compute_p_values = FALSE,
                                     dispersion_factor_method = c("pearson", "ml"),
-                                    init_dispersion_factor = 1,
+                                    init_dispersion_parameter = 1,
                                     remove_collinear_columns = FALSE,
                                     intercept = TRUE,
                                     non_negative = FALSE,
@@ -514,8 +530,11 @@ h2o.glm <- function(x,
                                     generate_scoring_history = FALSE,
                                     auc_type = c("AUTO", "NONE", "MACRO_OVR", "WEIGHTED_OVR", "MACRO_OVO", "WEIGHTED_OVO"),
                                     dispersion_epsilon = 0.0001,
+                                    tweedie_epsilon = 8e-17,
                                     max_iterations_dispersion = 1000000,
                                     build_null_model = FALSE,
+                                    fix_dispersion_parameter = FALSE,
+                                    fix_tweedie_variance_power = FALSE,
                                     segment_columns = NULL,
                                     segment_models_id = NULL,
                                     parallelism = 1)
@@ -625,8 +644,8 @@ h2o.glm <- function(x,
     parms$compute_p_values <- compute_p_values
   if (!missing(dispersion_factor_method))
     parms$dispersion_factor_method <- dispersion_factor_method
-  if (!missing(init_dispersion_factor))
-    parms$init_dispersion_factor <- init_dispersion_factor
+  if (!missing(init_dispersion_parameter))
+    parms$init_dispersion_parameter <- init_dispersion_parameter
   if (!missing(remove_collinear_columns))
     parms$remove_collinear_columns <- remove_collinear_columns
   if (!missing(intercept))
@@ -685,10 +704,16 @@ h2o.glm <- function(x,
     parms$auc_type <- auc_type
   if (!missing(dispersion_epsilon))
     parms$dispersion_epsilon <- dispersion_epsilon
+  if (!missing(tweedie_epsilon))
+    parms$tweedie_epsilon <- tweedie_epsilon
   if (!missing(max_iterations_dispersion))
     parms$max_iterations_dispersion <- max_iterations_dispersion
   if (!missing(build_null_model))
     parms$build_null_model <- build_null_model
+  if (!missing(fix_dispersion_parameter))
+    parms$fix_dispersion_parameter <- fix_dispersion_parameter
+  if (!missing(fix_tweedie_variance_power))
+    parms$fix_tweedie_variance_power <- fix_tweedie_variance_power
 
   if( !missing(interactions) ) {
     # interactions are column names => as-is

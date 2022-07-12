@@ -73,7 +73,7 @@ class H2OGeneralizedLinearEstimator(H2OEstimator):
                  plug_values=None,  # type: Optional[Union[None, str, H2OFrame]]
                  compute_p_values=False,  # type: bool
                  dispersion_factor_method="pearson",  # type: Literal["pearson", "ml"]
-                 init_dispersion_factor=1.0,  # type: float
+                 init_dispersion_parameter=1.0,  # type: float
                  remove_collinear_columns=False,  # type: bool
                  intercept=True,  # type: bool
                  non_negative=False,  # type: bool
@@ -106,8 +106,11 @@ class H2OGeneralizedLinearEstimator(H2OEstimator):
                  generate_scoring_history=False,  # type: bool
                  auc_type="auto",  # type: Literal["auto", "none", "macro_ovr", "weighted_ovr", "macro_ovo", "weighted_ovo"]
                  dispersion_epsilon=0.0001,  # type: float
+                 tweedie_epsilon=8e-17,  # type: float
                  max_iterations_dispersion=1000000,  # type: int
                  build_null_model=False,  # type: bool
+                 fix_dispersion_parameter=False,  # type: bool
+                 fix_tweedie_variance_power=False,  # type: bool
                  ):
         """
         :param model_id: Destination id for this model; auto-generated if not specified.
@@ -241,10 +244,10 @@ class H2OGeneralizedLinearEstimator(H2OEstimator):
                Binomial only.
                Defaults to ``"pearson"``.
         :type dispersion_factor_method: Literal["pearson", "ml"]
-        :param init_dispersion_factor: Initial value of disperion factor to be estimated using either pearson or ml.
-               Default to 1.0.
+        :param init_dispersion_parameter: Initial value of disperion parameter to be estimated using either pearson or
+               ml.  Default to 1.0.
                Defaults to ``1.0``.
-        :type init_dispersion_factor: float
+        :type init_dispersion_parameter: float
         :param remove_collinear_columns: In case of linearly dependent columns, remove some of the dependent columns
                Defaults to ``False``.
         :type remove_collinear_columns: bool
@@ -368,6 +371,10 @@ class H2OGeneralizedLinearEstimator(H2OEstimator):
                will break out of the dispersion parameter estimation loop using maximum likelihood
                Defaults to ``0.0001``.
         :type dispersion_epsilon: float
+        :param tweedie_epsilon: In estimating tweedie dispersion parameter using maximum likelihood, this is used to
+               choose the lower and upper indices in the approximating of the infinite series summation.
+               Defaults to ``8e-17``.
+        :type tweedie_epsilon: float
         :param max_iterations_dispersion: control the maximum number of iterations in the dispersion parameter
                estimation loop using maximum likelihood
                Defaults to ``1000000``.
@@ -375,6 +382,14 @@ class H2OGeneralizedLinearEstimator(H2OEstimator):
         :param build_null_model: If set, will build a model with only the intercept.  Default to false.
                Defaults to ``False``.
         :type build_null_model: bool
+        :param fix_dispersion_parameter: If true, will fix dispersion_parameter value to the value set in
+               init_dispersion_parameter
+               Defaults to ``False``.
+        :type fix_dispersion_parameter: bool
+        :param fix_tweedie_variance_power: If true, will fix tweedie variance power value to the value set in
+               tweedie_variance_power
+               Defaults to ``False``.
+        :type fix_tweedie_variance_power: bool
         """
         super(H2OGeneralizedLinearEstimator, self).__init__()
         self._parms = {}
@@ -414,7 +429,7 @@ class H2OGeneralizedLinearEstimator(H2OEstimator):
         self.plug_values = plug_values
         self.compute_p_values = compute_p_values
         self.dispersion_factor_method = dispersion_factor_method
-        self.init_dispersion_factor = init_dispersion_factor
+        self.init_dispersion_parameter = init_dispersion_parameter
         self.remove_collinear_columns = remove_collinear_columns
         self.intercept = intercept
         self.non_negative = non_negative
@@ -447,8 +462,11 @@ class H2OGeneralizedLinearEstimator(H2OEstimator):
         self.generate_scoring_history = generate_scoring_history
         self.auc_type = auc_type
         self.dispersion_epsilon = dispersion_epsilon
+        self.tweedie_epsilon = tweedie_epsilon
         self.max_iterations_dispersion = max_iterations_dispersion
         self.build_null_model = build_null_model
+        self.fix_dispersion_parameter = fix_dispersion_parameter
+        self.fix_tweedie_variance_power = fix_tweedie_variance_power
 
     @property
     def training_frame(self):
@@ -1406,18 +1424,18 @@ class H2OGeneralizedLinearEstimator(H2OEstimator):
         self._parms["dispersion_factor_method"] = dispersion_factor_method
 
     @property
-    def init_dispersion_factor(self):
+    def init_dispersion_parameter(self):
         """
-        Initial value of disperion factor to be estimated using either pearson or ml.  Default to 1.0.
+        Initial value of disperion parameter to be estimated using either pearson or ml.  Default to 1.0.
 
         Type: ``float``, defaults to ``1.0``.
         """
-        return self._parms.get("init_dispersion_factor")
+        return self._parms.get("init_dispersion_parameter")
 
-    @init_dispersion_factor.setter
-    def init_dispersion_factor(self, init_dispersion_factor):
-        assert_is_type(init_dispersion_factor, None, numeric)
-        self._parms["init_dispersion_factor"] = init_dispersion_factor
+    @init_dispersion_parameter.setter
+    def init_dispersion_parameter(self, init_dispersion_parameter):
+        assert_is_type(init_dispersion_parameter, None, numeric)
+        self._parms["init_dispersion_parameter"] = init_dispersion_parameter
 
     @property
     def remove_collinear_columns(self):
@@ -2206,6 +2224,21 @@ class H2OGeneralizedLinearEstimator(H2OEstimator):
         self._parms["dispersion_epsilon"] = dispersion_epsilon
 
     @property
+    def tweedie_epsilon(self):
+        """
+        In estimating tweedie dispersion parameter using maximum likelihood, this is used to choose the lower and upper
+        indices in the approximating of the infinite series summation.
+
+        Type: ``float``, defaults to ``8e-17``.
+        """
+        return self._parms.get("tweedie_epsilon")
+
+    @tweedie_epsilon.setter
+    def tweedie_epsilon(self, tweedie_epsilon):
+        assert_is_type(tweedie_epsilon, None, numeric)
+        self._parms["tweedie_epsilon"] = tweedie_epsilon
+
+    @property
     def max_iterations_dispersion(self):
         """
         control the maximum number of iterations in the dispersion parameter estimation loop using maximum likelihood
@@ -2232,6 +2265,34 @@ class H2OGeneralizedLinearEstimator(H2OEstimator):
     def build_null_model(self, build_null_model):
         assert_is_type(build_null_model, None, bool)
         self._parms["build_null_model"] = build_null_model
+
+    @property
+    def fix_dispersion_parameter(self):
+        """
+        If true, will fix dispersion_parameter value to the value set in init_dispersion_parameter
+
+        Type: ``bool``, defaults to ``False``.
+        """
+        return self._parms.get("fix_dispersion_parameter")
+
+    @fix_dispersion_parameter.setter
+    def fix_dispersion_parameter(self, fix_dispersion_parameter):
+        assert_is_type(fix_dispersion_parameter, None, bool)
+        self._parms["fix_dispersion_parameter"] = fix_dispersion_parameter
+
+    @property
+    def fix_tweedie_variance_power(self):
+        """
+        If true, will fix tweedie variance power value to the value set in tweedie_variance_power
+
+        Type: ``bool``, defaults to ``False``.
+        """
+        return self._parms.get("fix_tweedie_variance_power")
+
+    @fix_tweedie_variance_power.setter
+    def fix_tweedie_variance_power(self, fix_tweedie_variance_power):
+        assert_is_type(fix_tweedie_variance_power, None, bool)
+        self._parms["fix_tweedie_variance_power"] = fix_tweedie_variance_power
 
     Lambda = deprecated_property('Lambda', lambda_)
 
