@@ -16,7 +16,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static hex.gam.GamTestPiping.massageFrame;
 import static hex.glm.GLMModel.GLMParameters.Family.gaussian;
+import static hex.modelselection.ModelSelectionMaxRTests.compareResultFModelSummary;
 import static hex.modelselection.ModelSelectionModel.ModelSelectionParameters.Mode.maxr;
 import static hex.modelselection.ModelSelectionModel.ModelSelectionParameters.Mode.maxrsweep;
 import static hex.modelselection.ModelSelectionUtils.*;
@@ -693,6 +695,33 @@ public class ModelSelectionMaxRSweepTests extends TestUtil {
             Scope.track(resultMaxR);
             TestUtil.assertIdenticalUpToRelTolerance(new Frame(resultFrameSweep.vec(2)), new Frame(resultMaxR.vec(2)), 1e-6);
             TestUtil.assertIdenticalUpToRelTolerance(new Frame(resultFrameSweep.vec(3)), new Frame(resultMaxR.vec(3)), 0);
+        } finally {
+            Scope.exit();
+        }
+    }
+
+    /**
+     * Test and make sure the added and removed predictors are captured in both the result frame and the model summary.
+     * In particular, I want to make sure that they agree.  The correctness of the added/removed predictors are tested
+     * in Python unit test and won't be repeated here.
+     */
+    @Test
+    public void testAddedRemovedCols() {
+        Scope.enter();
+        try {
+            Frame train = Scope.track(massageFrame(parseTestFile("smalldata/glm_test/gaussian_20cols_10000Rows.csv"),
+                    gaussian));
+            DKV.put(train);
+            ModelSelectionModel.ModelSelectionParameters parms = new ModelSelectionModel.ModelSelectionParameters();
+            parms._response_column = "C21";
+            parms._family = gaussian;
+            parms._max_predictor_number = 3;
+            parms._seed=12345;
+            parms._train = train._key;
+            parms._mode = maxrsweep;
+            ModelSelectionModel modelMaxrsweep = new hex.modelselection.ModelSelection(parms).trainModel().get();
+            Scope.track_generic(modelMaxrsweep); //  model with validation dataset
+            compareResultFModelSummary(modelMaxrsweep);
         } finally {
             Scope.exit();
         }

@@ -2,6 +2,7 @@ package hex.modelselection;
 
 import hex.glm.GLM;
 import hex.glm.GLMModel;
+import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import water.*;
@@ -16,7 +17,10 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static hex.gam.GamTestPiping.massageFrame;
 import static hex.glm.GLMModel.GLMParameters.Family.*;
+import static hex.modelselection.ModelSelectionMaxRTests.compareResultFModelSummary;
+import static hex.modelselection.ModelSelectionModel.ModelSelectionParameters.Mode.allsubsets;
 import static hex.modelselection.ModelSelectionModel.ModelSelectionParameters.Mode.backward;
 import static org.junit.Assert.assertTrue;
 
@@ -341,5 +345,32 @@ public class BackwardSelectionTests extends TestUtil {
         if (ignoredCols != null)
             parms._ignored_columns = ignoredCols;
         return new hex.modelselection.ModelSelection(parms).trainModel().get();
+    }
+
+    /**
+     * Test and make sure the added and removed predictors are captured in both the result frame and the model summary.
+     * In particular, I want to make sure that they agree.  The correctness of the added/removed predictors are tested
+     * in Python unit test and won't be repeated here.
+     */
+    @Test
+    public void testAddedRemovedCols() {
+        Scope.enter();
+        try {
+            Frame train = Scope.track(massageFrame(parseTestFile("smalldata/glm_test/gaussian_20cols_10000Rows.csv"),
+                    gaussian));
+            DKV.put(train);
+            ModelSelectionModel.ModelSelectionParameters parms = new ModelSelectionModel.ModelSelectionParameters();
+            parms._response_column = "C21";
+            parms._family = gaussian;
+            parms._max_predictor_number = 3;
+            parms._seed=12345;
+            parms._train = train._key;
+            parms._mode = backward;
+            ModelSelectionModel modelBackward = new hex.modelselection.ModelSelection(parms).trainModel().get();
+            Scope.track_generic(modelBackward); //  model with validation dataset
+            compareResultFModelSummary(modelBackward);
+        } finally {
+            Scope.exit();
+        }
     }
 }
