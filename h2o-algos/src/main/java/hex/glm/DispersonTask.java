@@ -15,7 +15,6 @@ import static org.apache.commons.math3.special.Gamma.gamma;
 import static org.apache.commons.math3.special.Gamma.logGamma;
 
 public class DispersonTask {
-    public static final int CONSTANT_COLUMN_NUMBER = 7;
     public static final double LOG2 = Math.log(2);
     /***
      * Class to pre-calculate constants assocated with the following processes:
@@ -211,15 +210,17 @@ public class DispersonTask {
         int _indexBound;
         double _logDispersionEpsilon;
         boolean[] _computationAccuracy; // set to false when upper bound exceeds _indexBound
+        int _constantColumnNumber;
 
         public ComputeMaxSumSeriesTsk(Job j, TweedieMLDispersionOnly tdispersion, GLMModel.GLMParameters parms) {
             _variancePower = tdispersion._variancePower;
             _dispersionParameter = tdispersion._dispersionParameter;
-            _alpha = tdispersion._alpha;
+            _alpha = (2.0-_variancePower)/(1.0-_variancePower);
             _job = j;
             _weightPresent = tdispersion._weightPresent;
             _infoFrame = tdispersion._infoFrame;
             _nWorkCols = tdispersion._nWorkingCol;
+            _constantColumnNumber = tdispersion._constFrameNames.length;
             _constColOffset = _infoFrame.numCols()-_nWorkCols-tdispersion._constNCol;
             _workColOffset = _infoFrame.numCols()-_nWorkCols;
             _oneMinusAlpha = 1-_alpha;
@@ -236,12 +237,22 @@ public class DispersonTask {
             _alphaMinus1OverPhi = (_alpha-1)/_dispersionParameter;
             _alphaMinus1OverPhiSquare = _alphaMinus1OverPhi*_alphaMinus1OverPhi;
         }
+        
+        public void updatePhiParams(double newPhi) {
+            _dispersionParameter = newPhi;
+            _oneOverPhiPower = 1.0/Math.pow(_dispersionParameter, _oneMinusAlpha);
+            _oneOverPhiSquare = 1.0/(_dispersionParameter * _dispersionParameter);
+            _oneOverPhi3 = _oneOverPhiSquare/_dispersionParameter;
+            _oneOverDispersion = 1/_dispersionParameter;
+            _alphaMinus1TLogDispersion = (_alpha-1)*Math.log(_dispersionParameter);
+            _alphaMinus1OverPhiSquare = _alphaMinus1OverPhi*_alphaMinus1OverPhi;
+        }
 
         public void setIndices(Map<_ConstColNames, Integer> constColName2Ind, Map<_InfoColNames, Integer> infoColName2Ind) {
             DispersonTask.ComputeMaxSumSeriesTsk._ConstColNames[] constVal = 
                     DispersonTask.ComputeMaxSumSeriesTsk._ConstColNames.values();
             int offset = _weightPresent ? 3 : 2;
-            for (int index=0; index<CONSTANT_COLUMN_NUMBER; index++)
+            for (int index = 0; index< _constantColumnNumber; index++)
                 constColName2Ind.put(constVal[index], index+offset);
             
             DispersonTask.ComputeMaxSumSeriesTsk._InfoColNames[] infoC = 

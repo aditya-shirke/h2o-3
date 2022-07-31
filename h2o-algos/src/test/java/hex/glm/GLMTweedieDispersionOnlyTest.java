@@ -143,11 +143,12 @@ public class GLMTweedieDispersionOnlyTest extends TestUtil {
                 mlDisp, params);
         computeTask.doAll(mlDisp._infoFrame);   // generated info columns
         DKV.put(mlDisp._infoFrame);
-        compareInfoColFrame(params, mlDisp, tot);
+        compareInfoColFrame(computeTask, params, mlDisp, tot);
         mlDisp.cleanUp();
     }
 
-    public void compareInfoColFrame(GLMModel.GLMParameters parms, TweedieMLDispersionOnly mlDisp, double tot) {
+    public void compareInfoColFrame(DispersonTask.ComputeMaxSumSeriesTsk computeTsk,  GLMModel.GLMParameters parms,
+                                    TweedieMLDispersionOnly mlDisp, double tot) {
         Frame infoColFrame = mlDisp._infoFrame;
         Scope.track(infoColFrame);
         String[] infoColNames = mlDisp._workFrameNames;
@@ -155,13 +156,24 @@ public class GLMTweedieDispersionOnlyTest extends TestUtil {
         int numRows = (int) infoColFrame.numRows();
         double[] manualInfoColsRow = new double[infoColNum];
         double[] infoColsRow = new double[infoColNum];
+        double loglikelihood = 0;
+        double dLoglikelihood = 0;
+        double d2Loglikelihood = 0;
+        int lastInd = infoColNum-1;
         
         int offset = mlDisp._weightPresent ? 3+mlDisp._constFrameNames.length : 2+mlDisp._constFrameNames.length;
         for (int rowIndex = 0; rowIndex < numRows; rowIndex++) {
             extractFrame2Array(infoColsRow, infoColFrame, offset, rowIndex);
             manuallyGenerateInfoCols(manualInfoColsRow, mlDisp, parms, rowIndex, infoColsRow);
+            loglikelihood += manualInfoColsRow[lastInd-2];
+            dLoglikelihood += manualInfoColsRow[lastInd-1];
+            d2Loglikelihood += manualInfoColsRow[lastInd];
             Assert.assertTrue(TestUtil.equalTwoArrays(manualInfoColsRow, infoColsRow, tot));
         }
+        // check loglikelihood, dloglikelihood and d2loglikelihood sums
+        Assert.assertTrue(Math.abs(Math.round(loglikelihood)-Math.round(computeTsk._logLL)) < tot);
+        Assert.assertTrue(Math.abs(Math.round(dLoglikelihood)-Math.round(computeTsk._dLogLL)) < tot);
+        Assert.assertTrue(Math.abs(Math.round(d2Loglikelihood)-Math.round(computeTsk._d2LogLL)) < tot);
     }
     
     public void manuallyGenerateInfoCols(double[] manualInfoCols, TweedieMLDispersionOnly mlDisp,
@@ -173,7 +185,7 @@ public class GLMTweedieDispersionOnlyTest extends TestUtil {
         double weight = mlDisp._weightPresent ? respMu.vec(2).at(rowInd) : 1;
         double p = params._tweedie_variance_power;    
         double phi = mlDisp._dispersionParameter;
-        double alpha = mlDisp._alpha;
+        double alpha = (2.0-p)/(1.0-p);
         if (!Double.isNaN(resp)) {
             // generate jKMaxIndex
             double jkMax = resp == 0 ? 0 : Math.max(1, Math.ceil(p < 2 ? weight*Math.pow(resp, 2-p)/((2-p)*phi) : 
@@ -353,6 +365,7 @@ public class GLMTweedieDispersionOnlyTest extends TestUtil {
         double mu = respMu.vec(1).at(rowInd);
         double weight = mlDisp._weightPresent ? respMu.vec(2).at(rowInd) : 1;
         double p = params._tweedie_variance_power;
+        double alpha = (2.0-p)/(1.0-p);
         if (!Double.isNaN(resp)) {
             // calculate jMaxConst
             if (resp != 0)
@@ -360,8 +373,8 @@ public class GLMTweedieDispersionOnlyTest extends TestUtil {
             else
                 manualConstRow[0] = Double.NaN;
             // calculate zConst
-            manualConstRow[1] = resp == 0 ? 0 : Math.pow(weight, 1-mlDisp._alpha)*Math.pow(resp, -mlDisp._alpha)* 
-                    Math.pow(p-1, mlDisp._alpha)/(2-p);
+            manualConstRow[1] = resp == 0 ? 0 : Math.pow(weight, 1-alpha)*Math.pow(resp, -alpha)* 
+                    Math.pow(p-1, alpha)/(2-p);
             // calculate part2Const
             if (resp==0.0) {
                 manualConstRow[2] = -weight*Math.pow(mu, 2-p)/(2-p);

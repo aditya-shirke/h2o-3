@@ -58,8 +58,7 @@ public class DispersionUtils {
         return seOld;
     }
 
-    public static double estimateTweedieDispersionOnly(GLMModel.GLMParameters parms,
-                                                       GLMModel model, Job job) {
+    public static double estimateTweedieDispersionOnly(GLMModel.GLMParameters parms, GLMModel model, Job job) {
         long currTime = System.currentTimeMillis();
         long modelBuiltTime = currTime - model._output._start_time;
         long timeLeft = parms._max_runtime_secs > 0 ? (long) (parms._max_runtime_secs * 1000 - modelBuiltTime) 
@@ -76,7 +75,7 @@ public class DispersionUtils {
             // set new alpha
             numerator = computeTask._dLogLL;
             denominator = computeTask._d2LogLL;
-            change = numerator/denominator;
+            change = numerator/denominator; // no line search is employed at the moment ToDo: add line search
             if (denominator == 0 || Double.isNaN(change))
                 return seOld;
             if (Math.abs(change) < parms._dispersion_epsilon) {
@@ -89,7 +88,7 @@ public class DispersionUtils {
                 else
                     seOld = se;
             }
-            tDispersion.updatePhiConstant(seOld);
+            computeTask.updatePhiParams(se);
             // set step size ??
             if ((index % 100 == 0) && // check for additional stopping conditions for every 100th iterative steps
                     (job.stop_requested() ||  // user requested stop via stop_requested()
