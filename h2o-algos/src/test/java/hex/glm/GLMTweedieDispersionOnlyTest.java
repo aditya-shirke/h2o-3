@@ -22,6 +22,16 @@ import static org.apache.commons.math3.special.Gamma.logGamma;
 @RunWith(H2ORunner.class)
 @CloudSize(1)
 public class GLMTweedieDispersionOnlyTest extends TestUtil {
+    
+    @Test
+    public void testTweedieDispersionEstimation() {
+        Scope.enter();
+        try {
+            
+        } finally {
+            Scope.exit();
+        }
+    }
     /***
      * This test is written to make sure working columns generated is correct for variance power p, 1<p<2 and p>2
      */
