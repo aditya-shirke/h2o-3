@@ -49,7 +49,7 @@ public class TweedieMLDispersionOnly {
                     "djOrkL", "djOrkU", "sumWV", "sumDWV", "sumD2WV", "ll", "dll", "d2ll"};
             _nWorkingCol = _workFrameNames.length;
             Vec[] vecs = _infoFrame.anyVec().makeDoubles(_nWorkingCol, DoubleStream.generate(()
-                    -> Math.random()).limit(_nWorkingCol).toArray());
+                    -> Math.random()).limit(_nWorkingCol).map(x -> 0.0).toArray());
             _infoFrame.add(_workFrameNames, vecs);
             DKV.put(_infoFrame);
         }
@@ -71,6 +71,10 @@ public class TweedieMLDispersionOnly {
         }
         infoFrame.add(colNames, vecs);
         return infoFrame;
+    }
+    
+    public void updateDispersionP(double phi) {
+        _dispersionParameter = phi;
     }
     
     public void cleanUp() {

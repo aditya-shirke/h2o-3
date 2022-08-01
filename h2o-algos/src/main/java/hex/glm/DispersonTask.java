@@ -205,6 +205,7 @@ public class DispersonTask {
         double _alphaMinus1TLogDispersion;
         double _alphaTimesPI;
         double _alphaMinus1OverPhi;
+        double _alphaMinus1SquareOverPhiSquare;
         double _alphaMinus1OverPhiSquare;
         int _nWVs = 3;
         int _indexBound;
@@ -235,7 +236,8 @@ public class DispersonTask {
             _logDispersionEpsilon = Math.log(parms._tweedie_epsilon);
             _computationAccuracy = new boolean[_nWVs];
             _alphaMinus1OverPhi = (_alpha-1)/_dispersionParameter;
-            _alphaMinus1OverPhiSquare = _alphaMinus1OverPhi*_alphaMinus1OverPhi;
+            _alphaMinus1SquareOverPhiSquare = _alphaMinus1OverPhi*_alphaMinus1OverPhi;
+            _alphaMinus1OverPhiSquare = _alphaMinus1OverPhi/_dispersionParameter;
         }
         
         public void updatePhiParams(double newPhi) {
@@ -245,7 +247,7 @@ public class DispersonTask {
             _oneOverPhi3 = _oneOverPhiSquare/_dispersionParameter;
             _oneOverDispersion = 1/_dispersionParameter;
             _alphaMinus1TLogDispersion = (_alpha-1)*Math.log(_dispersionParameter);
-            _alphaMinus1OverPhiSquare = _alphaMinus1OverPhi*_alphaMinus1OverPhi;
+            _alphaMinus1SquareOverPhiSquare = _alphaMinus1OverPhi*_alphaMinus1OverPhi;
         }
 
         public void setIndices(Map<_ConstColNames, Integer> constColName2Ind, Map<_InfoColNames, Integer> infoColName2Ind) {
@@ -290,11 +292,11 @@ public class DispersonTask {
                     djKL = estimateLowerBound(jKIndMax, dwvMax, logZ, 1, new EvalLogDWVEnv());
                     djKU = estimateUpperBound(jKIndMax, dwvMax, logZ, 1, new EvalLogDWVEnv());
                     // sum the series W, dW, d2W
-                    sumWVj = sumWV(jKL, jKU, wvMax, logZ, new EvalLogWVEnv()) * Math.exp(_variancePower < 2
-                            ? chks[constColName2Ind.get(LogOneOverY)].atd(rInd) : chks[constColName2Ind.get(LogOneOverPiY)].atd(rInd));
+                    sumWVj = sumWV(jKL, jKU, wvMax, logZ, new EvalLogWVEnv()); // 1/y or 1/(Pi*y) cancelled in ratio. will ignore
                     oneOverSumWVj = 1.0 / sumWVj;
                     sumDWVj = sumWV(djKL, djKU, dwvMax, logZ, new EvalLogDWVEnv()) * _alphaMinus1OverPhi;
-                    sumD2WVj = sumWV(djKL, djKU, d2wvMax, logZ, new EvalLogD2WVEnv()) * _alphaMinus1OverPhiSquare;
+                    sumD2WVj = sumWV(djKL, djKU, d2wvMax, logZ, new EvalLogD2WVEnv()) * _alphaMinus1SquareOverPhiSquare
+                    - sumDWVj*_oneOverDispersion;
                 }
                 // calculate loglikelihood, d ll/d phi, d2ll/dphi2 by doing the actual sum of the series
                 tempLL = evalLogLikelihood(chks, rInd, sumWVj, constColName2Ind);
@@ -454,9 +456,9 @@ public class DispersonTask {
                     return logPart2;
                 } else {
                     if (_variancePower < 2)
-                        return Math.log(sumWV)+logPart2;
+                        return Math.log(sumWV/chks[0].atd(rowInd))+logPart2;
                     else 
-                        return Math.log(sumWV)+logPart2;
+                        return Math.log(sumWV/(Math.PI*chks[0].atd(rowInd)))+logPart2;
                 }
             } else {
                 return 0.0;

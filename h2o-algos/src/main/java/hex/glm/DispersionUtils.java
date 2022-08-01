@@ -1,9 +1,13 @@
 package hex.glm;
 
 import hex.DataInfo;
+import water.DKV;
 import water.Job;
 import water.fvec.Frame;
 import water.util.Log;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class DispersionUtils {
     /***
@@ -65,13 +69,16 @@ public class DispersionUtils {
                 : Long.MAX_VALUE;
 
         TweedieMLDispersionOnly tDispersion = new TweedieMLDispersionOnly(parms.train(), parms, model, job);
-        DispersonTask.ComputeMaxSumSeriesTsk computeTask = new DispersonTask.ComputeMaxSumSeriesTsk(job, tDispersion,
-                parms);
-
         double seOld = tDispersion._dispersionParameter;   // initial value of dispersion parameter
         double change, se, numerator, denominator;
+        List<Double> logValues = new ArrayList<>();
         for (int index=0; index<parms._max_iterations_dispersion; index++) {
+            DispersonTask.ComputeMaxSumSeriesTsk computeTask = new DispersonTask.ComputeMaxSumSeriesTsk(job, tDispersion,
+                    parms);
             computeTask.doAll(tDispersion._infoFrame);
+            DKV.put(tDispersion._infoFrame);
+            if (parms._debugTDispersionOnly)
+                logValues.add(computeTask._logLL);
             // set new alpha
             numerator = computeTask._dLogLL;
             denominator = computeTask._d2LogLL;
@@ -88,7 +95,7 @@ public class DispersionUtils {
                 else
                     seOld = se;
             }
-            computeTask.updatePhiParams(se);
+            tDispersion.updateDispersionP(seOld);
             // set step size ??
             if ((index % 100 == 0) && // check for additional stopping conditions for every 100th iterative steps
                     (job.stop_requested() ||  // user requested stop via stop_requested()
@@ -101,6 +108,6 @@ public class DispersionUtils {
             }
         }
         tDispersion.cleanUp();
-        return tDispersion._dispersionParameter;
+        return seOld;
     }
 }

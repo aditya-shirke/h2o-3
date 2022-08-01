@@ -16,6 +16,7 @@ import java.util.Arrays;
 import java.util.stream.IntStream;
 
 import static hex.glm.GLMModel.GLMParameters.DispersionMethod.pearson;
+import static hex.glm.GLMModel.GLMParameters.Family.tweedie;
 import static org.apache.commons.math3.special.Gamma.gamma;
 import static org.apache.commons.math3.special.Gamma.logGamma;
 
@@ -27,7 +28,20 @@ public class GLMTweedieDispersionOnlyTest extends TestUtil {
     public void testTweedieDispersionEstimation() {
         Scope.enter();
         try {
-            
+            Frame train = parseAndTrackTestFile("smalldata/glm_test/tweedie_1p8Power_2Dispersion_5Col_10KRows.csv");
+            GLMModel.GLMParameters params = new GLMModel.GLMParameters();
+            params._tweedie_variance_power=1.2;
+            params._family = tweedie;
+            params._fix_tweedie_variance_power = true;
+            params._debugTDispersionOnly = true;
+            params._dispersion_factor_method = GLMModel.GLMParameters.DispersionMethod.ml;
+            params._compute_p_values = true;
+            params._lambda = new double[]{0.0};
+            params._response_column = "resp";
+            params._train = train._key;
+            GLMModel glmML = new GLM(params).trainModel().get();
+            Scope.track_generic(glmML);
+            double trueDispersion = 2;
         } finally {
             Scope.exit();
         }
@@ -76,7 +90,7 @@ public class GLMTweedieDispersionOnlyTest extends TestUtil {
         params._train = train._key;
         params._compute_p_values = true;
         params._dispersion_factor_method = pearson;
-        params._family = GLMModel.GLMParameters.Family.tweedie;
+        params._family = tweedie;
         params._lambda = new double[]{0.0};
         GLMModel glmML = new GLM(params).trainModel().get();
         Scope.track_generic(glmML);
@@ -144,7 +158,7 @@ public class GLMTweedieDispersionOnlyTest extends TestUtil {
         params._train = train._key;
         params._compute_p_values = true;
         params._dispersion_factor_method = pearson;
-        params._family = GLMModel.GLMParameters.Family.tweedie;
+        params._family = tweedie;
         params._lambda = new double[]{0.0};
         GLMModel glmML = new GLM(params).trainModel().get();
         Scope.track_generic(glmML);
@@ -178,6 +192,7 @@ public class GLMTweedieDispersionOnlyTest extends TestUtil {
             loglikelihood += manualInfoColsRow[lastInd-2];
             dLoglikelihood += manualInfoColsRow[lastInd-1];
             d2Loglikelihood += manualInfoColsRow[lastInd];
+            Log.info("row index "+rowIndex);
             Assert.assertTrue(TestUtil.equalTwoArrays(manualInfoColsRow, infoColsRow, tot));
         }
         // check loglikelihood, dloglikelihood and d2loglikelihood sums
@@ -222,42 +237,50 @@ public class GLMTweedieDispersionOnlyTest extends TestUtil {
             System.arraycopy(infoColRow, 5, manualInfoCols, 5, 4);
             // cal LL, DLL, D2LL
             double sumWV = resp == 0 ? 0 : calWVSum(p, logZ, alpha, (int) manualInfoCols[5], (int) manualInfoCols[6],
-                    resp, manualInfoCols[2]);
-            manualInfoCols[9] = sumWV;
+                    resp);  // this one contains 1/y or 1/(pi*y)
+            manualInfoCols[9] = sumWV*(p < 2 ? resp : (Math.PI*resp)); // without 1/y or 1/(PI*y)
             double part2 = -Math.pow(mu, 2-p)/(phi*(2-p));
             manualInfoCols[12] = resp==0 ? part2 : resp*Math.pow(mu, 1-p)/((1-p)*phi)+part2+Math.log(sumWV);
             double sumDWV  = resp == 0 ? 0 : calDWV(p, logZ, alpha, (int) manualInfoCols[7], (int) manualInfoCols[8], phi);
             manualInfoCols[10] = sumDWV;
-            double dWOverW = resp == 0 ? 0 : sumDWV/sumWV;
+            double dWOverW = resp == 0 ? 0 : sumDWV/manualInfoCols[9];
             double dpart2 = Math.pow(mu, 2-p)/(phi*phi*(2-p));
             manualInfoCols[13] = resp==0?dpart2:dpart2+dWOverW+resp*Math.pow(mu,1-p)/(phi*phi*(p-1));
            double d2part2 = -2*Math.pow(mu, 2-p)/(phi*phi*phi*(2-p));
            double sumD2WV = resp==0 ? 0 : calD2WV(p, logZ, alpha, (int) manualInfoCols[7], (int) manualInfoCols[8], phi);
            manualInfoCols[11] = sumD2WV;
-           double d2WVOverdPhi = resp==0 ? 0 : (sumWV*sumD2WV-sumDWV*sumDWV)/(sumWV*sumWV);
+           double d2WVOverdPhi = resp==0 ? 0 : (manualInfoCols[9]*sumD2WV-sumDWV*sumDWV)/(manualInfoCols[9]*manualInfoCols[9]);
            manualInfoCols[14] = resp==0 ? d2part2 : -2*resp*Math.pow(mu, 1-p)/(phi*phi*phi*(p-1))+d2part2+d2WVOverdPhi;
         }
     }
+
     public double calD2WV(double vPower, double logZ, double alpha, int djkL, int djkU, double phi) {
-        if (vPower < 2)
-        return IntStream.rangeClosed(djkL, djkU).mapToDouble(x -> 
-                Math.exp(calD2LogWV(vPower, logZ, alpha, x))).sum()*(1-alpha)*(1-alpha)/(phi*phi);
-        else 
-            return IntStream.rangeClosed(djkL, djkU).mapToDouble(x ->
-                Math.exp(calD2LogWV(vPower, logZ, alpha, x))*Math.pow(-1, x)*Math.sin(-x*Math.PI*alpha)).sum()*(1-alpha)*(1-alpha)/(phi*phi);
-            
+        if (vPower < 2) {
+            double part1 = IntStream.rangeClosed(djkL, djkU).mapToDouble(x ->
+                    Math.exp(calD2LogWV(vPower, logZ, alpha, x))).sum() * (1 - alpha) * (1 - alpha) / (phi * phi);
+            double part2 = IntStream.rangeClosed(djkL, djkU).mapToDouble(x ->
+                    Math.exp(calDLogWV(vPower, logZ, alpha, x))).sum() * (1 - alpha) / (phi * phi);
+            return part1 + part2;
+        } else {
+            double part1 = IntStream.rangeClosed(djkL, djkU).mapToDouble(x ->
+                    Math.exp(calD2LogWV(vPower, logZ, alpha, x)) * Math.pow(-1, x) * Math.sin(-x * Math.PI * alpha)).sum() * (1 - alpha) * (1 - alpha) / (phi * phi);
+            double part2 = IntStream.rangeClosed(djkL, djkU).mapToDouble(x ->
+                    Math.exp(calDLogWV(vPower, logZ, alpha, x)) * Math.pow(-1, x) * Math.sin(-x * Math.PI * alpha)).sum() * (1 - alpha) / (phi * phi);
+            return part1 + part2;
+        }
     }
     
     public double calDWV(double vPower, double logZ, double alpha,  int DjkL, int DjkU, 
                               double phi) {
         if (vPower < 2)
-            return IntStream.rangeClosed(DjkL, DjkU).mapToDouble(x -> Math.exp(calDLogWV(vPower, logZ, alpha, x))).sum() * (alpha - 1) / phi;
+            return IntStream.rangeClosed(DjkL, DjkU).mapToDouble(x ->
+                    Math.exp(calDLogWV(vPower, logZ, alpha, x))).sum() * (alpha - 1) / phi;
         else
             return IntStream.rangeClosed(DjkL, DjkU).mapToDouble(x -> 
-                    Math.exp(calDLogWV(vPower, logZ, alpha, x))*Math.pow(-1, x)*Math.sin(-x*Math.PI*alpha)).sum() * (alpha - 1) / phi;
+                Math.exp(calDLogWV(vPower, logZ, alpha, x))*Math.pow(-1, x)*Math.sin(-x*Math.PI*alpha)).sum() * (alpha - 1) / phi;
     }
     
-    public double calWVSum(double vPower, double logZ, double alpha, int jkL, int jkU, double resp, double logWVMax) {
+    public double calWVSum(double vPower, double logZ, double alpha, int jkL, int jkU, double resp) {
         if (vPower < 2) {
             double aYPhi = IntStream.rangeClosed(jkL, jkU).mapToDouble(x -> Math.exp(calLogWV(vPower, logZ, alpha, x))).sum();
             return aYPhi / resp;
@@ -334,7 +357,7 @@ public class GLMTweedieDispersionOnlyTest extends TestUtil {
         params._train = train._key;
         params._compute_p_values = true;
         params._dispersion_factor_method = pearson;
-        params._family = GLMModel.GLMParameters.Family.tweedie;
+        params._family = tweedie;
         params._lambda = new double[]{0.0};
         GLMModel glmML = new GLM(params).trainModel().get();
         Scope.track_generic(glmML);

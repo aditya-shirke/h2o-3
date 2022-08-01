@@ -1011,8 +1011,11 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
           error("max_iterations_dispersion", " must > 0.");
         if (_parms._dispersion_epsilon < 0)
           error("dispersion_epsilon", " must >= 0.");
-        if (_parms._init_dispersion_parameter <= 1)
-          error("init_dispersion_parameter", " must exceed 1.");
+        if (_parms._tweedie_variance_power <= 1 || _parms._tweedie_variance_power == 2)
+          error("tweedie_variance_power", " must exceed 1 and cannot be equal to 2.  For " +
+                  "tweedie_variance_power of 1, please choose poisson.  For tweedie_variance_power of 2, please choose" +
+                  " gamma.");
+        
         if (_parms._tweedie_epsilon <= 0)
           error("tweedie_epsilon", " must exceed 0.");
       }
@@ -1201,7 +1204,7 @@ public class GLM extends ModelBuilder<GLMModel,GLMParameters,GLMOutput> {
         error("fix_tweedie_variance_power", " is only allowed for tweedie family");
       
       if (_parms._fix_tweedie_variance_power && tweedie.equals(_parms._family)) {
-        if (!ml.equals(_parms._fix_tweedie_variance_power))
+        if (!ml.equals(_parms._dispersion_factor_method))
           error("fix_tweedie_variance_power", " can only be used when dispersion_factor_method=ml");
         
         if (_parms._tweedie_variance_power ==1 )
