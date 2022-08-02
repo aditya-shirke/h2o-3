@@ -5,6 +5,8 @@ import water.MRTask;
 import water.fvec.Chunk;
 import water.fvec.Frame;
 import water.fvec.NewChunk;
+import water.util.Log;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.IntStream;
@@ -240,16 +242,6 @@ public class DispersonTask {
             _alphaMinus1OverPhiSquare = _alphaMinus1OverPhi/_dispersionParameter;
         }
         
-        public void updatePhiParams(double newPhi) {
-            _dispersionParameter = newPhi;
-            _oneOverPhiPower = 1.0/Math.pow(_dispersionParameter, _oneMinusAlpha);
-            _oneOverPhiSquare = 1.0/(_dispersionParameter * _dispersionParameter);
-            _oneOverPhi3 = _oneOverPhiSquare/_dispersionParameter;
-            _oneOverDispersion = 1/_dispersionParameter;
-            _alphaMinus1TLogDispersion = (_alpha-1)*Math.log(_dispersionParameter);
-            _alphaMinus1SquareOverPhiSquare = _alphaMinus1OverPhi*_alphaMinus1OverPhi;
-        }
-
         public void setIndices(Map<_ConstColNames, Integer> constColName2Ind, Map<_InfoColNames, Integer> infoColName2Ind) {
             DispersonTask.ComputeMaxSumSeriesTsk._ConstColNames[] constVal = 
                     DispersonTask.ComputeMaxSumSeriesTsk._ConstColNames.values();
@@ -267,6 +259,7 @@ public class DispersonTask {
         }
 
         public void map(Chunk[] chks) {
+            int chunkID = chks[0].cidx();
             int chkLen = chks[0].len();
             int jKIndMax=0, jKL=0, jKU=0, djKL=0, djKU=0;
             double wvMax=0, dwvMax=0, d2wvMax=0, logZ=0, sumWVj=0, sumDWVj=0, sumD2WVj=0, oneOverSumWVj=0;
@@ -351,14 +344,14 @@ public class DispersonTask {
             if (jOrkMax == 1)   // small speedup
                 return 1;
             double logWV1 = cVal.calculate(1, _alpha, logZ, logWorVmax, _variancePower);
-            if ((logWV1 - logWorVmax) > _logDispersionEpsilon)
+            if ((logWV1 - logWorVmax) >= _logDispersionEpsilon)
                 return 1;
             else {   // call recursive function
                 int indexLow = 1;
                 int indexHigh = jOrkMax;
                 int indexMid = (int) Math.round(0.5*(indexLow+indexHigh));
                 double logVal;
-                while (indexLow < indexHigh) {
+                while ((indexLow < indexHigh) && (indexHigh != indexMid) && (indexLow != indexMid)) {
                     logVal = cVal.calculate(indexMid, _alpha, logZ, logWorVmax, _variancePower);
                     if (logVal - logWorVmax < _logDispersionEpsilon)
                         indexLow = indexMid;

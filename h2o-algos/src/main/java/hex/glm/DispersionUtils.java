@@ -72,13 +72,17 @@ public class DispersionUtils {
         double seOld = tDispersion._dispersionParameter;   // initial value of dispersion parameter
         double change, se, numerator, denominator;
         List<Double> logValues = new ArrayList<>();
+        List<Double> seValues = new ArrayList<>();
+        
         for (int index=0; index<parms._max_iterations_dispersion; index++) {
             DispersonTask.ComputeMaxSumSeriesTsk computeTask = new DispersonTask.ComputeMaxSumSeriesTsk(job, tDispersion,
                     parms);
             computeTask.doAll(tDispersion._infoFrame);
             DKV.put(tDispersion._infoFrame);
-            if (parms._debugTDispersionOnly)
+            if (parms._debugTDispersionOnly) {
                 logValues.add(computeTask._logLL);
+                seValues.add(seOld);
+            }
             // set new alpha
             numerator = computeTask._dLogLL;
             denominator = computeTask._d2LogLL;

@@ -30,7 +30,7 @@ public class GLMTweedieDispersionOnlyTest extends TestUtil {
         try {
             Frame train = parseAndTrackTestFile("smalldata/glm_test/tweedie_1p8Power_2Dispersion_5Col_10KRows.csv");
             GLMModel.GLMParameters params = new GLMModel.GLMParameters();
-            params._tweedie_variance_power=1.2;
+            params._tweedie_variance_power=1.8;
             params._family = tweedie;
             params._fix_tweedie_variance_power = true;
             params._debugTDispersionOnly = true;
@@ -39,6 +39,7 @@ public class GLMTweedieDispersionOnlyTest extends TestUtil {
             params._lambda = new double[]{0.0};
             params._response_column = "resp";
             params._train = train._key;
+            params._init_dispersion_parameter = 2.0;
             GLMModel glmML = new GLM(params).trainModel().get();
             Scope.track_generic(glmML);
             double trueDispersion = 2;
